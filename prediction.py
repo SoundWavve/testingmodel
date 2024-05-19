@@ -34,9 +34,17 @@ def extract_features(wav_path, num_features=25, max_length=1220):
     return features.reshape(1, max_length, num_features), rate
 
 def write_wav(wav_path, rate, data):
+    # Ensure the data is in the correct format
+    data = np.asarray(data, dtype=np.int16)
+    
+    # Reshape the data to be 1D if necessary
+    if data.ndim > 1:
+        data = data.flatten()
+    
+    # Write the WAV file
     wavfile.write(wav_path, rate, data)
 
-input_wav = 'source.wav'
+input_wav = 'input.wav'
 output_wav = 'output.wav'
 meta_path = 'mfcc_model_epoch_3129.meta'
 data_path = 'mfcc_model_epoch_3129.data-00000-of-00001'
@@ -57,6 +65,10 @@ with tf.compat.v1.Session() as sess:
     input_tensor = graph.get_tensor_by_name("Placeholder:0")
     output_tensor = graph.get_tensor_by_name("Tanh_1:0")
     output_features = sess.run(output_tensor, feed_dict={input_tensor: input_features})
+
+    if output_features.ndim > 1:
+        output_features = output_features.flatten()
+
     write_wav(output_wav, rate, output_features.astype(np.int16))
 
     sess.close()
