@@ -27,10 +27,10 @@ def write_wav(wav_path, rate, data):
 
 
 
-input_wav = 'input.wav'
+input_wav = 'source.wav'
 output_wav = 'output.wav'
-meta_path = 'mfcc_model_epoch_1402.meta'
-data_path = 'mfcc_model_epoch_1402.data-00000-of-00001'
+meta_path = 'mfcc_model_epoch_3129.meta'
+data_path = 'mfcc_model_epoch_3129.data-00000-of-00001'
 
 # Start a session
 with tf.compat.v1.Session() as sess:
@@ -44,8 +44,8 @@ with tf.compat.v1.Session() as sess:
 
     # Get the graph
     graph = tf.compat.v1.get_default_graph()
-    for op in graph.get_operations():
-        print(op.name)
+    # for op in graph.get_operations():
+    #     print(op.name)
     input_tensor = graph.get_tensor_by_name("Placeholder_1:0")
     output_tensor = graph.get_tensor_by_name("Tanh_1:0")
     output_features = sess.run(output_tensor, feed_dict={input_tensor: input_features})
