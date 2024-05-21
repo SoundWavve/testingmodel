@@ -1,8 +1,12 @@
+import os
+os.environ['MKL_THREADING_LAYER'] = 'GNU'
+os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # Use CPU only
+
 import tensorflow as tf
 import numpy as np
 from scipy.io import wavfile
 from python_speech_features import mfcc, delta
-import matlab.engine
+import librosa
 
 # Function to read a .wav file and extract MFCC features
 def extract_features(wav_path, num_features=25, max_length=1220):
@@ -26,12 +30,19 @@ def write_wav(wav_path, rate, data):
     data = np.asarray(data, dtype=np.float32)
     wavfile.write(wav_path, rate, data)
 
+# Function to invert MFCC features back to waveform
+def mfcc_to_wav(mfcc_feat, rate, n_mfcc=13, n_mels=128, n_fft=2048, hop_length=512):
+    mfcc_feat = np.squeeze(mfcc_feat)
+    # Inverse MFCC to Mel spectrogram
+    mel_spec = librosa.feature.inverse.mfcc_to_mel(mfcc_feat, n_mels=n_mels, dct_type=2)
+    # Convert Mel spectrogram to linear spectrogram
+    linear_spec = librosa.feature.inverse.mel_to_stft(mel_spec, sr=rate, n_fft=n_fft, power=2.0)
+    # Convert linear spectrogram to audio
+    audio = librosa.griffinlim(linear_spec, hop_length=hop_length)
+    return audio
+
 # Main function
 def main(input_wav, output_wav, meta_path, data_path):
-    # Start MATLAB engine
-    eng = matlab.engine.start_matlab()
-    eng.addpath('../model/invMFCCs_new')
-
     tf.compat.v1.disable_eager_execution()
     input_features, rate = extract_features(input_wav)
     
@@ -48,19 +59,14 @@ def main(input_wav, output_wav, meta_path, data_path):
         
         # Process each batch of predicted MFCC features
         for i in range(output_features.shape[0]):
-            predicted_mfccs_transposed = np.transpose(output_features[i,:,:])
-            
-            # Convert MFCC features to waveform using invmelfcc function in MATLAB
-            inverted_wav_data = eng.invmelfcc(matlab.double(predicted_mfccs_transposed.tolist()), rate, 25)
-            inverted_wav_data = np.squeeze(np.array(inverted_wav_data))
+            predicted_mfccs = output_features[i, :, :]
+            inverted_wav_data = mfcc_to_wav(predicted_mfccs, rate)
 
             # Normalize the waveform data to be between -1 and 1
-            maxVec = np.max(inverted_wav_data)
-            minVec = np.min(inverted_wav_data)
-            inverted_wav_data = ((inverted_wav_data - minVec) / (maxVec - minVec) - 0.5) * 2
+            inverted_wav_data = inverted_wav_data / np.max(np.abs(inverted_wav_data))
             
             # Write the waveform data to a .wav file
-            wavfile.write(output_wav, int(rate), inverted_wav_data.astype(np.float32))
+            write_wav(output_wav, int(rate), inverted_wav_data)
 
 if __name__ == "__main__":
     input_wav = 'input.wav'
